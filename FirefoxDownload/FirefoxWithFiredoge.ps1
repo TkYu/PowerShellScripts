@@ -6,26 +6,18 @@ if($PSVersionTable.PSVersion.Major -lt 3){
 	Write-Host "I need PowerShell major version >= 3, Current is $($PSVersionTable.PSVersion.Major)" -ForegroundColor Red
 	return
 }
+
 $installLocation = $env:ffdir
-if ([string]::IsNullOrEmpty($installLocation)){
-	$installLocation = (Resolve-Path .\).Path
-}
-Write-Host "Current install location is $installLocation"
-if((Test-Path $installLocation)){
-	if(-Not ((Get-ChildItem $installLocation | Measure-Object).Count -eq 0)){
-		Write-Host 'I need an empty folder!' -ForegroundColor Red
-		return
-	}
-}
-else{
-	Write-Host "Create directory $installLocation" -ForegroundColor Yellow
-	New-Item -ItemType Directory -Force -Path $installLocation | Out-Null
-}
 $local = $env:ffloc
+$arch = $env:ffarch
+$branch = $env:ffbranch
+$url = 'https://www.mozilla.org/en-US/firefox/channel/desktop/'
+
+#$local check
 if ([string]::IsNullOrEmpty($local)){
 	$local = (Get-UICulture).Name
 }
-$arch = $env:ffarch
+#$arch check
 if ([string]::IsNullOrEmpty($arch)){
 	if($ENV:PROCESSOR_ARCHITECTURE -eq 'AMD64'){
 		$arch = 'win64'
@@ -34,18 +26,39 @@ if ([string]::IsNullOrEmpty($arch)){
 		$arch = 'win'
 	}
 }
-$branch = $env:ffbranch
+#$branch check
 switch ($branch) 
 { 
+	'nightly' {$branch = 'firefox-nightly-latest-l10n'} 
+	'dev' {$branch = 'firefox-devedition-latest'} 
 	'beta' {$branch = 'firefox-beta-latest'} 
 	'esr' {$branch = 'firefox-esr-latest'} 
 	default {$branch = 'firefox-latest'}
 }
 Write-Host "Current branch is $branch" -ForegroundColor Yellow
-$url = "https://download.mozilla.org/?product=$branch&os=$arch&lang=$local"
-$downloadFileName = Join-Path $installLocation 'installer.exe'
+$url = "https://download.mozilla.org/?product=$branch-ssl&os=$arch&lang=$local"
 if ($env:TEMP -eq $null) {
-  $env:TEMP = Join-Path $installLocation 'temp'
+	$env:TEMP = Join-Path $installLocation 'temp'
+}
+#$installLocation check
+if ([string]::IsNullOrEmpty($installLocation)){
+	$installLocation = (Resolve-Path .\).Path
+}
+
+function Check-InstallLocation {
+	
+	Write-Host "Current install location is $installLocation"
+	if((Test-Path $installLocation)){
+		if(-Not ((Get-ChildItem $installLocation | Measure-Object).Count -eq 0)){
+			Write-Host 'I need an empty folder!' -ForegroundColor Red
+			return $false
+		}
+	}
+	else{
+		Write-Host "Create directory $installLocation" -ForegroundColor Yellow
+		New-Item -ItemType Directory -Force -Path $installLocation | Out-Null
+	}
+	return $true
 }
 
 function Get-Downloader {
@@ -161,18 +174,27 @@ param (
 	}
 }
 
-Download-File $url $downloadFileName
-if(-Not (Test-Path $installLocation)){
-	return
+function Download-Firefox {
+	$downloadFileName = Join-Path $installLocation 'installer.exe'
+	Download-File $url $downloadFileName
+	if(-Not (Test-Path $downloadFileName)){
+		Write-Host 'Firefox Download Fail!' -ForegroundColor Red
+		return
+	}
+	Extract-File $downloadFileName $installLocation
+	Remove-IfExists "$installLocation\setup.exe"
+	Move-Item "$installLocation\core\*" -Destination $installLocation
+	Remove-IfExists "$installLocation\core"
+	Remove-IfExists $downloadFileName
+	Write-Host 'Firefox Download Finished' -ForegroundColor Green
 }
-Extract-File $downloadFileName $installLocation
-Remove-IfExists "$installLocation\setup.exe"
-Move-Item "$installLocation\core\*" -Destination $installLocation
-Remove-IfExists "$installLocation\core"
-Remove-IfExists $downloadFileName
 
-Write-Host 'Firefox Download Finished' -ForegroundColor Green
-
+if(Check-InstallLocation) {
+	Download-Firefox
+}
+else{
+	Write-Host 'Firefox Download Skipped' -ForegroundColor Yellow
+}
 
 $JSON = Download-String 'https://static.pzhacm.org/shuax/fd/fd.json' | ConvertFrom-Json
 if([string]::IsNullOrEmpty($JSON.description)){
