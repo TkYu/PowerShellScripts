@@ -34,7 +34,15 @@ if ([string]::IsNullOrEmpty($arch)){
 		$arch = 'win'
 	}
 }
-$url = "https://download.mozilla.org/?product=firefox-latest-ssl&os=$arch&lang=$local"
+$branch = $env:ffbranch
+switch ($branch) 
+{ 
+	'beta' {$branch = 'firefox-beta-latest'} 
+	'esr' {$branch = 'firefox-esr-latest'} 
+	default {$branch = 'firefox-latest'}
+}
+Write-Host "Current branch is $branch" -ForegroundColor Yellow
+$url = "https://download.mozilla.org/?product=$branch&os=$arch&lang=$local"
 $downloadFileName = Join-Path $installLocation 'installer.exe'
 if ($env:TEMP -eq $null) {
   $env:TEMP = Join-Path $installLocation 'temp'
