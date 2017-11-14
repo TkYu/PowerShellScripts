@@ -37,12 +37,14 @@ switch ($branch)
 }
 Write-Host "Current branch is $branch" -ForegroundColor Yellow
 $url = "https://download.mozilla.org/?product=$branch-ssl&os=$arch&lang=$local"
-if ($env:TEMP -eq $null) {
-	$env:TEMP = Join-Path $installLocation 'temp'
-}
 #$installLocation check
 if ([string]::IsNullOrEmpty($installLocation)){
 	$installLocation = (Resolve-Path .\).Path
+}
+
+
+if ($env:TEMP -eq $null) {
+	$env:TEMP = Join-Path $installLocation 'temp'
 }
 
 function Check-InstallLocation {
@@ -114,18 +116,32 @@ param (
 function Download-File {
 param (
   [string]$url,
-  [string]$file
+  [string]$targetFile
  )
-	try{
-		Write-Host "Downloading $url to $file" -ForegroundColor Yellow
-		$downloader = Get-Downloader $url
-		$downloader.DownloadFile($url, $file)
-	}catch{
-		Remove-Item $file
-		Write-Host "Download $url fail!" -ForegroundColor Red
-		return
-	}
-	Write-Host "Download finished" -ForegroundColor Green
+   #https://blogs.msdn.microsoft.com/jasonn/2008/06/13/downloading-files-from-the-internet-in-powershell-with-progress/
+   $uri = New-Object "System.Uri" "$url"
+   $request = [System.Net.HttpWebRequest]::Create($uri)
+   $request.Proxy = [System.Net.GlobalProxySelection]::GetEmptyWebProxy()
+   $request.Timeout = 60000 #60 second timeout 
+   $response = $request.GetResponse()
+   $totalLength = [System.Math]::Floor($response.get_ContentLength()/1024)
+   $responseStream = $response.GetResponseStream()
+   $targetStream = New-Object -TypeName System.IO.FileStream -ArgumentList $targetFile, Create
+   $buffer = new-object byte[] 256KB
+   $count = $responseStream.Read($buffer,0,$buffer.length)
+   $downloadedBytes = $count
+   while ($count -gt 0)
+   {
+	   $targetStream.Write($buffer, 0, $count)
+	   $count = $responseStream.Read($buffer,0,$buffer.length)
+	   $downloadedBytes = $downloadedBytes + $count
+	   Write-Progress -activity "Downloading file '$($url.split('/') | Select -Last 1)'" -status "Downloaded ($([System.Math]::Floor($downloadedBytes/1024))K of $($totalLength)K): " -PercentComplete ((([System.Math]::Floor($downloadedBytes/1024)) / $totalLength)  * 100)
+   }
+   Write-Progress -activity "Finished downloading file '$($url.split('/') | Select -Last 1)'" -Status "Ready" -Completed
+   $targetStream.Flush()
+   $targetStream.Close()
+   $targetStream.Dispose()
+   $responseStream.Dispose()
 }
 
 function Extract-File {
