@@ -239,7 +239,7 @@ if(Test-Path $gcdllpath){
 }else{
 	$hash = ''
 }
-if($arch -eq 'win64'){
+if($arch -eq 'x64'){
 	if($hash -eq $GCJSON.link.x64.sha1){
 		Write-Host "$gcdll is latest!" -ForegroundColor Green
 	}else{
