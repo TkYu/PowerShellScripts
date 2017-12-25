@@ -28,6 +28,7 @@
   <ItemGroup />
   <ItemGroup>
     <Compile Include="Chrome.ps1" />
+    <Compile Include="ChromeGCTW.ps1" />
     <Compile Include="ChromeWithGreenChrome.ps1" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
