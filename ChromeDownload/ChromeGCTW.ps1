@@ -1,17 +1,16 @@
 ﻿if($ENV:OS -ne 'Windows_NT'){
-	Write-Host 'Windows Plz!' -ForegroundColor Red
+	Write-Host '請在 Windows 作業系統上使用!' -ForegroundColor Red
 	return
 }
 if($PSVersionTable.PSVersion.Major -lt 3){
-	Write-Host "I need PowerShell major version >= 3, Current is $($PSVersionTable.PSVersion.Major)" -ForegroundColor Red
+	Write-Host "請使用 PowerShell 主要版本 >= 3, 目前版本為 $($PSVersionTable.PSVersion.Major)" -ForegroundColor Red
 	return
 }
-
 $installLocation = $env:ggdir
 $arch = $env:ggarch
 #$branch = $env:ggbranch
 $ggApi = 'https://api.pzhacm.org/iivb/cu.json'
-
+$gcApi = 'https://api.pzhacm.org/iivb/gc.json'
 
 if($PSVersionTable.PSVersion.Major -lt 5){
 	if (-not ([System.Management.Automation.PSTypeName]'Branch').Type){
@@ -61,9 +60,8 @@ switch ($env:ggbranch)
 #if([Enum]::Getvalues([Branch]) -contains $branch) {
 #	$Branch = [Enum]::Parse([Type]"Branch",$branch)
 #}
-Write-Host "Current branch is " -NoNewline -ForegroundColor DarkYellow
+Write-Host "目前設定分支為 " -NoNewline -ForegroundColor DarkYellow
 Write-Host $branch -ForegroundColor Green
-
 if ($env:TEMP -eq $null) {
 	$env:TEMP = Join-Path $installLocation 'temp'
 }
@@ -74,24 +72,24 @@ function Check-InstallLocation {
 			$onlineVersion = [System.Version]($JSON.$branch.$arch.version)
 			$localVersion = (Get-Item "$installLocation\chrome.exe").VersionInfo.FileVersion
 			if($onlineVersion -gt $localVersion){
-				Write-Host "Online version is " -NoNewline
+				Write-Host " 線上版本為 " -NoNewline
 				Write-Host $onlineVersion -NoNewline -ForegroundColor Green
-				Write-Host ", Local version is " -NoNewline
+				Write-Host ", 本機版本為  " -NoNewline
 				Write-Host $localVersion -NoNewline -ForegroundColor Yellow
-				Write-Host ', let`s update!'
+				Write-Host ', 讓我們更新吧!'
 			}
 			else{
-				Write-Host "You have the latest version($localVersion)/$branch/$arch" -ForegroundColor Green
+				Write-Host "你已使用最新版本($localVersion)/$branch/$arch" -ForegroundColor Green
 				return $false
 			}
 		} else {
 			if(-Not ((Get-ChildItem $installLocation | Measure-Object).Count -eq 0)){
-				Write-Host 'I need an empty folder!' -ForegroundColor Red
+				Write-Host '請在空資料夾中运行!' -ForegroundColor Red
 				return $false
 			}
 		}
 	} else {
-		Write-Host "Create directory $installLocation" -ForegroundColor Yellow
+		Write-Host "建立目錄 $installLocation" -ForegroundColor Yellow
 		New-Item -ItemType Directory -Force -Path $installLocation | Out-Null
 	}
 	return $true
@@ -132,9 +130,9 @@ param (
 	   $targetStream.Write($buffer, 0, $count)
 	   $count = $responseStream.Read($buffer,0,$buffer.length)
 	   $downloadedBytes = $downloadedBytes + $count
-	   Write-Progress -activity "Downloading file '$($url.split('/') | Select -Last 1)'" -status "Downloaded ($([System.Math]::Floor($downloadedBytes/1024))K of $($totalLength)K): " -PercentComplete ((([System.Math]::Floor($downloadedBytes/1024)) / $totalLength)  * 100)
+	   Write-Progress -activity "正在下載檔案 '$($url.split('/') | Select -Last 1)'" -status "下載進度 (已下載 $([System.Math]::Floor($downloadedBytes/1024))K , 檔案大小 $($totalLength)K): " -PercentComplete ((([System.Math]::Floor($downloadedBytes/1024)) / $totalLength)  * 100)
    }
-   Write-Progress -activity "Finished downloading file '$($url.split('/') | Select -Last 1)'" -Status "Ready" -Completed
+   Write-Progress -activity "已完成 '$($url.split('/') | Select -Last 1)'  下載" -Status "Ready" -Completed
    $targetStream.Flush()
    $targetStream.Close()
    $targetStream.Dispose()
@@ -148,10 +146,10 @@ param (
  )
 	#WARNING: this function copy from chocolatey.org install.ps1
 	#Write-Host "Extract $fileName to $dest" -ForegroundColor Yellow
-	Write-Host "Extracting $($fileName.split('\') | Select -Last 1)" -ForegroundColor Yellow
+	Write-Host "正在解壓縮 $($fileName.split('\') | Select -Last 1)" -ForegroundColor Yellow
 	$7zaExe = Join-Path $env:TEMP '7za.exe'
 	if (-Not (Test-Path ($7zaExe))) {
-		Write-Output "Downloading 7-Zip commandline tool prior to extraction."
+		Write-Output "為了解壓縮 Chrome 安裝包，正在下載 7-Zip 命令列工具。"
 		Download-File 'https://chocolatey.org/7za.exe' "$7zaExe"
 	}
 	$params = "x -o`"$dest`" -bd -y `"$fileName`""
@@ -166,7 +164,7 @@ param (
 	$exitCode = $process.ExitCode
 	$process.Dispose()
 
-	$errorMessage = "Unable to unzip package using 7zip. Error:"
+	$errorMessage = "無法使用 7-Zip 解壓縮 Chrome 安裝包。 錯誤:"
 	switch ($exitCode) {
 		0 { break }
 		1 { throw "$errorMessage Some files could not be extracted" }
@@ -194,12 +192,12 @@ function Download-Chrome {
 	$downloadFileName = Join-Path $installLocation $($url.split('/') | Select -Last 1)
 	Download-File $url $downloadFileName
 	if(-Not (Test-Path $downloadFileName)){
-		Write-Host 'Chrome Download Fail!' -ForegroundColor Red
+		Write-Host '下載 Chrome 失敗!' -ForegroundColor Red
 		return
 	}
 	$hash = (Get-FileHash $downloadFileName -Algorithm SHA256).Hash
 	if($hash -ne $JSON.$branch.$arch.sha256){
-		Write-Host "SHA256 not match!" -ForegroundColor Red
+		Write-Host "SHA256 不相符!" -ForegroundColor Red
 		Remove-IfExists $downloadFileName
 		return;
 	}
@@ -209,24 +207,97 @@ function Download-Chrome {
 	Move-Item "$installLocation\Chrome-bin\*" -Destination $installLocation
 	Remove-IfExists "$installLocation\Chrome-bin"
 	Remove-IfExists $downloadFileName
-	Write-Host 'Chrome Download Finished' -ForegroundColor Green
+	Write-Host '已完成 Chrome 下載' -ForegroundColor Green
 }
 
+function Check-GCInstallLocation {
+	if(Test-Path $gcdllpath){
+		$hash = (Get-FileHash $gcdllpath -Algorithm SHA1).Hash
+	} else {
+		$hash = ''
+	}
+	if($arch -eq 'x64'){
+		if($hash -eq $GCJSON.link.x64.sha1){
+			Write-Host "$gcdll 已是最新版本!" -ForegroundColor Green
+			return $false
+		}
+	} else {
+		if($hash -eq $GCJSON.link.x86.sha1){
+			Write-Host "$gcdll 已是最新版本!" -ForegroundColor Green
+			return $false
+		}
+	}
+	Write-Host "$gcdll 需要更新! 更新内容：" -NoNewline -ForegroundColor Yellow
+	Write-Host $GCJSON.description -ForegroundColor Gray
+	return $true
+}
+
+function Download-GreenChrome {
+	if($arch -eq 'x64'){
+		Download-File $GCJSON.link.x64.url $gcdllpath
+		$hash = (Get-FileHash $gcdllpath -Algorithm SHA1).Hash
+		if($hash -ne $GCJSON.link.x64.sha1){
+			Write-Host "SHA1 不相符!" -ForegroundColor Red
+			return;
+		}
+	}
+	else{
+		Download-File $GCJSON.link.x86.url $gcdllpath
+		$hash = (Get-FileHash $gcdllpath -Algorithm SHA1).Hash
+		if($hash -ne $GCJSON.link.x86.sha1){
+			Write-Host "SHA1 不相符!" -ForegroundColor Red
+			return;
+		}
+	}
+	$gcinipath = Join-Path $installLocation 'GreenChrome.ini'
+	if(-Not(Test-Path $gcinipath)){
+		Download-File 'https://static.pzhacm.org/shuax/GreenChromeTW.txt' $gcinipath
+	}
+	$updaterpath = Join-Path $installLocation 'Update.cmd'
+	if(-Not(Test-Path $updaterpath)){
+		'@"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command "iex ((New-Object System.Net.WebClient).DownloadString(''https://raw.githubusercontent.com/TkYu/PowerShellScripts/master/ChromeDownload/ChromeGCTW.ps1''))"', "@pause" -join "`r`n" | Out-File -Encoding "Default" $updaterpath
+	}
+	Write-Host 'GreenChrome(by Shuax) 下載已完成' -ForegroundColor Green
+}
+
+Write-Host ""
 try{
-	$JSON = Download-String 'https://api.pzhacm.org/iivb/cu.json' | ConvertFrom-Json
+	$JSON = Download-String $ggApi | ConvertFrom-Json
 }catch{
-	Write-Host 'Get versions error!' -ForegroundColor Red
+	Write-Host '取得Chrome版本號碼失敗!' -ForegroundColor Red
 	return
 }
 if(Check-InstallLocation) {
 	Download-Chrome
 }
+else{
+	Write-Host 'Chrome 下載已略過(本機已是最新版)' -ForegroundColor Yellow
+}
 
+Write-Host ""
+try{
+	$GCJSON = Download-String $gcApi | ConvertFrom-Json
+	if([string]::IsNullOrEmpty($GCJSON.description)){
+		Write-Host '取得GreenChrome版本號碼失敗!' -ForegroundColor Red
+		return;
+	}
+	$gcdll = $GCJSON.link.x64.url.Substring($GCJSON.link.x64.url.LastIndexOf("/") + 1)
+	$gcdllpath = Join-Path $installLocation $gcdll
+}catch{
+	Write-Host '取得GreenChrome版本號碼失敗!' -ForegroundColor Red
+	return
+}
+if(Check-GCInstallLocation) {
+	Download-GreenChrome
+}
+else{
+	Write-Host 'GreenChrome 下載已略過(本機已是最新版)' -ForegroundColor Yellow
+}
 # SIG # Begin signature block
 # MIIFlwYJKoZIhvcNAQcCoIIFiDCCBYQCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUSaasarT3vF5pJnM+mY4rHBLz
-# +Y6gggMtMIIDKTCCAhWgAwIBAgIQE3U7au1O4rZEMExUKPt7LTAJBgUrDgMCHQUA
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQU3YF6Rt9oQ34Ic1LDPv8gD9VB
+# 4cCgggMtMIIDKTCCAhWgAwIBAgIQE3U7au1O4rZEMExUKPt7LTAJBgUrDgMCHQUA
 # MB8xHTAbBgNVBAMTFFRLUG93ZXJTaGVsbFRlc3RDZXJ0MB4XDTE3MTEwOTA3MTg0
 # MVoXDTM5MTIzMTIzNTk1OVowHzEdMBsGA1UEAxMUVEtQb3dlclNoZWxsVGVzdENl
 # cnQwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCZwoClq3b+amIlFj53
@@ -246,11 +317,11 @@ if(Check-InstallLocation) {
 # GhVCMYIB1DCCAdACAQEwMzAfMR0wGwYDVQQDExRUS1Bvd2VyU2hlbGxUZXN0Q2Vy
 # dAIQE3U7au1O4rZEMExUKPt7LTAJBgUrDgMCGgUAoHgwGAYKKwYBBAGCNwIBDDEK
 # MAigAoAAoQKAADAZBgkqhkiG9w0BCQMxDAYKKwYBBAGCNwIBBDAcBgorBgEEAYI3
-# AgELMQ4wDAYKKwYBBAGCNwIBFTAjBgkqhkiG9w0BCQQxFgQU9iNobPzcvy3d2oyz
-# PT5rqIn6uOIwDQYJKoZIhvcNAQEBBQAEggEAZUMahHwM46nUtaTDocy09CZtk7kd
-# tN1LpugcSYyRRiDQmjiVsCJ8NdPI6oxPr9mxW7Q1xYl/ak4l+FWcwsJ14yUs6UMn
-# V7TID92yXh6DcEv7nwVSdnideMdy2uScAaYnVCI+rVL7sqTIyyx7Ha32zCYWqqua
-# VhnxwpGFjA3XEIl4PorgKhVpVDyPeirt87dfu4OHOhOc54pCH/EunwywX1e7diZI
-# rzwR2S4Le8zMqbvw/+kn006ipiXGVZK/FGuNElvOdY7pBybONkhquZie3oAeXFPi
-# ELBorwuIm3l8kJCJuAjak0OGnMIIbYzJE5rdS6TnIrXkZI9UrlMOWMXp6Q==
+# AgELMQ4wDAYKKwYBBAGCNwIBFTAjBgkqhkiG9w0BCQQxFgQUk1hYmwfTrk02EmmW
+# nyjN98aixGMwDQYJKoZIhvcNAQEBBQAEggEAKSDrjOIApw/Hv1UoIlUbzOg9wkDE
+# +OzXe74GN6Lt4DM1fPtNmXgJG6BruKJdPXTgnlDoxxNzBgmtDbmV80bmqXyrOqlZ
+# Mnno+czEPH8ciRGZVGYzXkfi07fA6CQnPEi1fyFQFUAG8A5g8G/WITDsBwbzaPr/
+# 1FcdDBs0VCx456Vf52iGSSUx2Scr0Jhb5/RhxmArO8FFP3EGlA1CF/o12JU0vkyG
+# Yx9P/nRczPg35P1eE8GRcXGwFKo5AU0Vwq/S541Wq3b8u2DZbzaa+8++SlL0ixsr
+# RmI4tS5x75xZuk7tRr16oGotSfufwLM61+YWn7RdAukfoOZn8e6D1M6F4Q==
 # SIG # End signature block
