@@ -6,12 +6,11 @@ if($PSVersionTable.PSVersion.Major -lt 3){
 	Write-Host "I need PowerShell major version >= 3, Current is $($PSVersionTable.PSVersion.Major)" -ForegroundColor Red
 	return
 }
-
 $installLocation = $env:ggdir
 $arch = $env:ggarch
 #$branch = $env:ggbranch
 $ggApi = 'https://api.pzhacm.org/iivb/cu.json'
-
+$gcApi = 'https://api.pzhacm.org/iivb/gc.json'
 
 if($PSVersionTable.PSVersion.Major -lt 5){
 	if (-not ([System.Management.Automation.PSTypeName]'Branch').Type){
@@ -63,11 +62,9 @@ switch ($env:ggbranch)
 #}
 Write-Host "Current branch is " -NoNewline -ForegroundColor DarkYellow
 Write-Host $branch -ForegroundColor Green
-
 if ($env:TEMP -eq $null) {
 	$env:TEMP = Join-Path $installLocation 'temp'
 }
-
 function Check-InstallLocation {
 	if((Test-Path $installLocation)){
 		if((Test-Path "$installLocation\chrome.exe")){
@@ -119,7 +116,7 @@ param (
    $uri = New-Object "System.Uri" "$url"
    $request = [System.Net.HttpWebRequest]::Create($uri)
    $request.Proxy = [System.Net.GlobalProxySelection]::GetEmptyWebProxy()
-   $request.Timeout = 60000 #60 second timeout 
+   $request.Timeout = 200000 #200 second timeout 
    $response = $request.GetResponse()
    $totalLength = [System.Math]::Floor($response.get_ContentLength()/1024)
    $responseStream = $response.GetResponseStream()
@@ -201,7 +198,7 @@ function Download-Chrome {
 	if($hash -ne $JSON.$branch.$arch.sha256){
 		Write-Host "SHA256 not match!" -ForegroundColor Red
 		Remove-IfExists $downloadFileName
-		return;
+		return
 	}
 	Extract-File $downloadFileName $installLocation
 	Extract-File $chrome7z $installLocation
@@ -212,64 +209,92 @@ function Download-Chrome {
 	Write-Host 'Chrome Download Finished' -ForegroundColor Green
 }
 
+function Check-GCInstallLocation {
+	if(Test-Path $gcdllpath){
+		$hash = (Get-FileHash $gcdllpath -Algorithm SHA1).Hash
+	} else {
+		$hash = ''
+	}
+	if($arch -eq 'x64'){
+		if($hash -eq $GCJSON.link.x64.sha1){
+			Write-Host "$gcdll is latest!" -ForegroundColor Green
+			return $false
+		}
+	} else {
+		if($hash -eq $GCJSON.link.x86.sha1){
+			Write-Host "$gcdll is latest!" -ForegroundColor Green
+			return $false
+		}
+	}
+	Write-Host "$gcdll need update : " -NoNewline -ForegroundColor Yellow
+	Write-Host $GCJSON.description -ForegroundColor Gray
+	return $true
+}
+
+function Download-GreenChrome {
+	if($arch -eq 'x64'){
+		Download-File $GCJSON.link.x64.url $gcdllpath
+		$hash = (Get-FileHash $gcdllpath -Algorithm SHA1).Hash
+		if($hash -ne $GCJSON.link.x64.sha1){
+			Write-Host "SHA1 not match!" -ForegroundColor Red
+			return
+		}
+	}
+	else{
+		Download-File $GCJSON.link.x86.url $gcdllpath
+		$hash = (Get-FileHash $gcdllpath -Algorithm SHA1).Hash
+		if($hash -ne $GCJSON.link.x86.sha1){
+			Write-Host "SHA1 not match!" -ForegroundColor Red
+			return
+		}
+	}
+	Write-Host 'GreenChrome(by Shuax) download finished' -ForegroundColor Green
+}
+
+Write-Host ""
 try{
-	$JSON = Download-String 'https://api.pzhacm.org/iivb/cu.json' | ConvertFrom-Json
+	$JSON = Download-String $ggApi | ConvertFrom-Json
 }catch{
-	Write-Host 'Get versions error!' -ForegroundColor Red
+	Write-Host 'Get Chrome versions failed!' -ForegroundColor Red
 	return
 }
 if(Check-InstallLocation) {
 	Download-Chrome
 }
 else{
-	Write-Host 'Chrome Download Skipped' -ForegroundColor Yellow
+	Write-Host 'Chrome download skipped' -ForegroundColor Yellow
 }
 
-$GCJSON = Download-String 'https://api.pzhacm.org/iivb/gc.json' | ConvertFrom-Json
-if([string]::IsNullOrEmpty($GCJSON.description)){
-	Write-Host "Get GreenChrome version fail!" -ForegroundColor Red
-	return;
-}
-Write-Host "Current GreenChrome version is $($GCJSON.version)" -ForegroundColor Gray
-Write-Host $GCJSON.description -ForegroundColor Gray
-$gcdll = $GCJSON.link.x64.url.Substring($GCJSON.link.x64.url.LastIndexOf("/") + 1)
-$gcdllpath = Join-Path $installLocation $gcdll
-if(Test-Path $gcdllpath){
-	$hash = (Get-FileHash $gcdllpath -Algorithm SHA1).Hash
-}else{
-	$hash = ''
-}
-if($arch -eq 'x64'){
-	if($hash -eq $GCJSON.link.x64.sha1){
-		Write-Host "$gcdll is latest!" -ForegroundColor Green
-	}else{
-		Download-File $GCJSON.link.x64.url $gcdllpath
-		$hash = (Get-FileHash $gcdllpath -Algorithm SHA1).Hash
-		if($hash -ne $GCJSON.link.x64.sha1){
-			Write-Host "SHA1 not match!" -ForegroundColor Red
-			return;
-		}
+Write-Host ""
+try{
+	$GCJSON = Download-String $gcApi | ConvertFrom-Json
+	if([string]::IsNullOrEmpty($GCJSON.description)){
+		Write-Host 'Get GreenChrome versions failed!' -ForegroundColor Red
+		return
 	}
+	$gcdll = $GCJSON.link.x64.url.Substring($GCJSON.link.x64.url.LastIndexOf("/") + 1)
+	$gcdllpath = Join-Path $installLocation $gcdll
+}catch{
+	Write-Host 'Get GreenChrome versions failed!' -ForegroundColor Red
+	return
+}
+if(Check-GCInstallLocation) {
+	Download-GreenChrome
 }
 else{
-	if($hash -eq $GCJSON.link.x86.sha1){
-		Write-Host "$gcdll is latest!" -ForegroundColor Green
-	}else{
-		Download-File $GCJSON.link.x86.url $gcdllpath
-		$hash = (Get-FileHash $gcdllpath -Algorithm SHA1).Hash
-		if($hash -ne $GCJSON.link.x86.sha1){
-			Write-Host "SHA1 not match!" -ForegroundColor Red
-			return;
-		}
-	}
+	Write-Host 'GreenChrome download skipped' -ForegroundColor Yellow
 }
-
-Write-Host 'GreenChrome(by Shuax) Download Finished' -ForegroundColor Green
+$updaterpath = Join-Path $installLocation 'Update.cmd'
+if(-Not(Test-Path $updaterpath)){
+	$lower = $branch.ToString().ToLower()
+	$updateps = "@SET `"ggbranch=$lower`" && @SET `"ggarch=$arch`" && " + ('@"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy AllSigned -Command "iex ((New-Object System.Net.WebClient).DownloadString(''https://raw.githubusercontent.com/TkYu/PowerShellScripts/master/ChromeDownload/ChromeWithGreenChrome.ps1''))"')
+	'@echo Checking Chrome update. Sit back and relax.', $updateps, "@pause" -join "`r`n" | Out-File -Encoding "Default" $updaterpath
+}
 # SIG # Begin signature block
 # MIIFlwYJKoZIhvcNAQcCoIIFiDCCBYQCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUaM/+dGrM3VYZIf8U6orC5rR1
-# jSWgggMtMIIDKTCCAhWgAwIBAgIQE3U7au1O4rZEMExUKPt7LTAJBgUrDgMCHQUA
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUNtUgf3lCtrFWM9aQBTWfztA3
+# ItygggMtMIIDKTCCAhWgAwIBAgIQE3U7au1O4rZEMExUKPt7LTAJBgUrDgMCHQUA
 # MB8xHTAbBgNVBAMTFFRLUG93ZXJTaGVsbFRlc3RDZXJ0MB4XDTE3MTEwOTA3MTg0
 # MVoXDTM5MTIzMTIzNTk1OVowHzEdMBsGA1UEAxMUVEtQb3dlclNoZWxsVGVzdENl
 # cnQwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCZwoClq3b+amIlFj53
@@ -289,11 +314,11 @@ Write-Host 'GreenChrome(by Shuax) Download Finished' -ForegroundColor Green
 # GhVCMYIB1DCCAdACAQEwMzAfMR0wGwYDVQQDExRUS1Bvd2VyU2hlbGxUZXN0Q2Vy
 # dAIQE3U7au1O4rZEMExUKPt7LTAJBgUrDgMCGgUAoHgwGAYKKwYBBAGCNwIBDDEK
 # MAigAoAAoQKAADAZBgkqhkiG9w0BCQMxDAYKKwYBBAGCNwIBBDAcBgorBgEEAYI3
-# AgELMQ4wDAYKKwYBBAGCNwIBFTAjBgkqhkiG9w0BCQQxFgQU5EJXz3EYmZinEGxM
-# hpL+EkpzP60wDQYJKoZIhvcNAQEBBQAEggEAASF3gKNwW7Ryp1Kf60PJUYdMhHhv
-# Hb0E8fbZu8WUSoqB6C+t4sDmFbo9XsOxfqcTcoXRzu8JqYlZIxLcE1JPOk+lOIW1
-# 4dq9GKdubwc7e6+Ufj8rHM2/nZcbsRwBlLlu+zfEF0+nxdkwiV3/CS14hn2ZC0fn
-# EYEI9tPgehSyD4x6ravWwv7qMKVD0QtWlFBk5v3UJGNc4Jzai2GsYTxkYkZieGGH
-# 2ctZdiGH0hQfHnRzE06p5cH6uSgdc1OjKuSAdSFiUa+DfQwMd6aUmaeS8KG9t8lZ
-# ZePlFfzmfnvTfq/1eKHo/ACO3pgha+sTQ2LK/XL+ehhJ3DkGrVDSkKrmHQ==
+# AgELMQ4wDAYKKwYBBAGCNwIBFTAjBgkqhkiG9w0BCQQxFgQUGer8gFeE6QiQCz7v
+# DO6U9seml3QwDQYJKoZIhvcNAQEBBQAEggEAUL5oEhfJLBRIxH4n5+nDVPCcj3r7
+# B+OgTBnP0MOiJvgPPQHzQi4MvpleHkmAh0TFWSlGelb61WUdrzYC4aJVc+EPlLjD
+# kqZ/d8bw4TMIaI+uzTjUWtaIxZjUe2V+rXR+SDRoJUMWwLJtksSQQZaz538KLTmu
+# dvKftjCPoTZcoGEOGj63P9hQ06EnOfCNfg2Wg8nPVUpd7TwBB52KILGnEur0PIZY
+# fWgwefGpISzV6zqmDhWYz+EKgx9kNhEYfCeLR8X3NO0CaGvBL61dxRW80pVhMtZT
+# Zh93/SxkkLnGybUA+hEINhWA74cePj+Gb5er6yZuuAj1I+9cylSOdg3rtQ==
 # SIG # End signature block

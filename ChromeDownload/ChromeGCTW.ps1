@@ -199,7 +199,7 @@ function Download-Chrome {
 	if($hash -ne $JSON.$branch.$arch.sha256){
 		Write-Host "SHA256 不相符!" -ForegroundColor Red
 		Remove-IfExists $downloadFileName
-		return;
+		return
 	}
 	Extract-File $downloadFileName $installLocation
 	Extract-File $chrome7z $installLocation
@@ -238,7 +238,7 @@ function Download-GreenChrome {
 		$hash = (Get-FileHash $gcdllpath -Algorithm SHA1).Hash
 		if($hash -ne $GCJSON.link.x64.sha1){
 			Write-Host "SHA1 不相符!" -ForegroundColor Red
-			return;
+			return
 		}
 	}
 	else{
@@ -246,7 +246,7 @@ function Download-GreenChrome {
 		$hash = (Get-FileHash $gcdllpath -Algorithm SHA1).Hash
 		if($hash -ne $GCJSON.link.x86.sha1){
 			Write-Host "SHA1 不相符!" -ForegroundColor Red
-			return;
+			return
 		}
 	}
 	$gcinipath = Join-Path $installLocation 'GreenChrome.ini'
@@ -255,7 +255,7 @@ function Download-GreenChrome {
 	}
 	$updaterpath = Join-Path $installLocation 'Update.cmd'
 	if(-Not(Test-Path $updaterpath)){
-		'@"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command "iex ((New-Object System.Net.WebClient).DownloadString(''https://raw.githubusercontent.com/TkYu/PowerShellScripts/master/ChromeDownload/ChromeGCTW.ps1''))"', "@pause" -join "`r`n" | Out-File -Encoding "Default" $updaterpath
+		'SET "ggbranch=beta" && SET "ggarch=D:\chrome" && @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command "iex ((New-Object System.Net.WebClient).DownloadString(''https://raw.githubusercontent.com/TkYu/PowerShellScripts/master/ChromeDownload/ChromeGCTW.ps1''))"', "@pause" -join "`r`n" | Out-File -Encoding "Default" $updaterpath
 	}
 	Write-Host 'GreenChrome(by Shuax) 下載已完成' -ForegroundColor Green
 }
@@ -279,7 +279,7 @@ try{
 	$GCJSON = Download-String $gcApi | ConvertFrom-Json
 	if([string]::IsNullOrEmpty($GCJSON.description)){
 		Write-Host '取得GreenChrome版本號碼失敗!' -ForegroundColor Red
-		return;
+		return
 	}
 	$gcdll = $GCJSON.link.x64.url.Substring($GCJSON.link.x64.url.LastIndexOf("/") + 1)
 	$gcdllpath = Join-Path $installLocation $gcdll
@@ -293,11 +293,12 @@ if(Check-GCInstallLocation) {
 else{
 	Write-Host 'GreenChrome 下載已略過(本機已是最新版)' -ForegroundColor Yellow
 }
+
 # SIG # Begin signature block
 # MIIFlwYJKoZIhvcNAQcCoIIFiDCCBYQCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUKt+awKBIVjb2AbOKyKkzGt0y
-# VvOgggMtMIIDKTCCAhWgAwIBAgIQE3U7au1O4rZEMExUKPt7LTAJBgUrDgMCHQUA
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUoGhb/QSfiy5r46iIQDTnV/b4
+# gTWgggMtMIIDKTCCAhWgAwIBAgIQE3U7au1O4rZEMExUKPt7LTAJBgUrDgMCHQUA
 # MB8xHTAbBgNVBAMTFFRLUG93ZXJTaGVsbFRlc3RDZXJ0MB4XDTE3MTEwOTA3MTg0
 # MVoXDTM5MTIzMTIzNTk1OVowHzEdMBsGA1UEAxMUVEtQb3dlclNoZWxsVGVzdENl
 # cnQwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCZwoClq3b+amIlFj53
@@ -317,11 +318,11 @@ else{
 # GhVCMYIB1DCCAdACAQEwMzAfMR0wGwYDVQQDExRUS1Bvd2VyU2hlbGxUZXN0Q2Vy
 # dAIQE3U7au1O4rZEMExUKPt7LTAJBgUrDgMCGgUAoHgwGAYKKwYBBAGCNwIBDDEK
 # MAigAoAAoQKAADAZBgkqhkiG9w0BCQMxDAYKKwYBBAGCNwIBBDAcBgorBgEEAYI3
-# AgELMQ4wDAYKKwYBBAGCNwIBFTAjBgkqhkiG9w0BCQQxFgQUrv5WB9+CY1GT2T6E
-# kMy9U+CfQ90wDQYJKoZIhvcNAQEBBQAEggEAAxzyin4o35J2fSeBayVas1aCOKyg
-# vk06xr0PtmxJpfJT8jNUDWwa6R++EU4xHLeYz3x3AWgQXtlaL00mA98JfczrDC08
-# vB1C8PwupBR7RpY+ntcO3zd1a1suPq/XtMPQeGb5VVtB+MmGd+pY4khH+zDd6x3d
-# z0jTKgaRr8DUgzYm/wr2ywbmcaXO07HKW82/mJc3vD6iVkbwuLHjUa22zAaGQPH7
-# HP0HX6htsCwITWcIY3iKS+zH4UzpDQqomSulqEFC9aqrB2woynR1eQezoUQ+h8mh
-# 1E4m4Z+eTJ5C8ApNFxKnfn6LhmMDaKMDity8iryhG1HCn0YxDobyHN8qww==
+# AgELMQ4wDAYKKwYBBAGCNwIBFTAjBgkqhkiG9w0BCQQxFgQU4bIVS5YR9uCeUDbN
+# 0VRqIaSlOAcwDQYJKoZIhvcNAQEBBQAEggEAKPomkEQyZA1WuakzsuqRzoL5LNlP
+# c1c+So8Bw3yFJwyfs17+cFnClHXAglOWL3AuOng7an7AeXZVPMm6PC+db0HeK5dd
+# Ta/7jZsjPEarjLd7GdT5mB141g3/YuNG9SAC2pPVA9xGbSy23EHTS2Gv1gD+Qnpz
+# q/UKmT43rJEgPTKi1qYxDS4Z5lEvQx6rCIgt83JZsKw0H7l9oJFWZbqfAxjgqIU2
+# DaL7yT4EhgkmFwLBbRLePFvDW01T9kMXqIj5Lr/F8fC0JL2WLUamVSZSYiQ4ZOe9
+# zn0tRlVVCf2+ea1tHH6kY/MJ0GgY2CAvdQFJp6tN775z9Y36EiZf5ySK7w==
 # SIG # End signature block

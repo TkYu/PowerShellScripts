@@ -6,12 +6,10 @@ if($PSVersionTable.PSVersion.Major -lt 3){
 	Write-Host "I need PowerShell major version >= 3, Current is $($PSVersionTable.PSVersion.Major)" -ForegroundColor Red
 	return
 }
-
 $installLocation = $env:ggdir
 $arch = $env:ggarch
 #$branch = $env:ggbranch
 $ggApi = 'https://api.pzhacm.org/iivb/cu.json'
-
 
 if($PSVersionTable.PSVersion.Major -lt 5){
 	if (-not ([System.Management.Automation.PSTypeName]'Branch').Type){
@@ -63,11 +61,9 @@ switch ($env:ggbranch)
 #}
 Write-Host "Current branch is " -NoNewline -ForegroundColor DarkYellow
 Write-Host $branch -ForegroundColor Green
-
 if ($env:TEMP -eq $null) {
 	$env:TEMP = Join-Path $installLocation 'temp'
 }
-
 function Check-InstallLocation {
 	if((Test-Path $installLocation)){
 		if((Test-Path "$installLocation\chrome.exe")){
@@ -119,7 +115,7 @@ param (
    $uri = New-Object "System.Uri" "$url"
    $request = [System.Net.HttpWebRequest]::Create($uri)
    $request.Proxy = [System.Net.GlobalProxySelection]::GetEmptyWebProxy()
-   $request.Timeout = 60000 #60 second timeout 
+   $request.Timeout = 200000 #200 second timeout 
    $response = $request.GetResponse()
    $totalLength = [System.Math]::Floor($response.get_ContentLength()/1024)
    $responseStream = $response.GetResponseStream()
@@ -201,7 +197,7 @@ function Download-Chrome {
 	if($hash -ne $JSON.$branch.$arch.sha256){
 		Write-Host "SHA256 not match!" -ForegroundColor Red
 		Remove-IfExists $downloadFileName
-		return;
+		return
 	}
 	Extract-File $downloadFileName $installLocation
 	Extract-File $chrome7z $installLocation
@@ -212,21 +208,31 @@ function Download-Chrome {
 	Write-Host 'Chrome Download Finished' -ForegroundColor Green
 }
 
+Write-Host ""
 try{
-	$JSON = Download-String 'https://api.pzhacm.org/iivb/cu.json' | ConvertFrom-Json
+	$JSON = Download-String $ggApi | ConvertFrom-Json
 }catch{
-	Write-Host 'Get versions error!' -ForegroundColor Red
+	Write-Host 'Get Chrome versions failed!' -ForegroundColor Red
 	return
 }
 if(Check-InstallLocation) {
 	Download-Chrome
 }
+else{
+	Write-Host 'Chrome download skipped' -ForegroundColor Yellow
+}
 
+$updaterpath = Join-Path $installLocation 'Update.cmd'
+if(-Not(Test-Path $updaterpath)){
+	$lower = $branch.ToString().ToLower()
+	$updateps = "@SET `"ggbranch=$lower`" && @SET `"ggarch=$arch`" && " + ('@"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy AllSigned -Command "iex ((New-Object System.Net.WebClient).DownloadString(''https://raw.githubusercontent.com/TkYu/PowerShellScripts/master/ChromeDownload/Chrome.ps1''))"')
+	'@echo Checking Chrome update. Sit back and relax.', $updateps, "@pause" -join "`r`n" | Out-File -Encoding "Default" $updaterpath
+}
 # SIG # Begin signature block
 # MIIFlwYJKoZIhvcNAQcCoIIFiDCCBYQCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUSaasarT3vF5pJnM+mY4rHBLz
-# +Y6gggMtMIIDKTCCAhWgAwIBAgIQE3U7au1O4rZEMExUKPt7LTAJBgUrDgMCHQUA
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUExvwmPvJdbSEFVCc5oDlpBR7
+# eXygggMtMIIDKTCCAhWgAwIBAgIQE3U7au1O4rZEMExUKPt7LTAJBgUrDgMCHQUA
 # MB8xHTAbBgNVBAMTFFRLUG93ZXJTaGVsbFRlc3RDZXJ0MB4XDTE3MTEwOTA3MTg0
 # MVoXDTM5MTIzMTIzNTk1OVowHzEdMBsGA1UEAxMUVEtQb3dlclNoZWxsVGVzdENl
 # cnQwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCZwoClq3b+amIlFj53
@@ -246,11 +252,11 @@ if(Check-InstallLocation) {
 # GhVCMYIB1DCCAdACAQEwMzAfMR0wGwYDVQQDExRUS1Bvd2VyU2hlbGxUZXN0Q2Vy
 # dAIQE3U7au1O4rZEMExUKPt7LTAJBgUrDgMCGgUAoHgwGAYKKwYBBAGCNwIBDDEK
 # MAigAoAAoQKAADAZBgkqhkiG9w0BCQMxDAYKKwYBBAGCNwIBBDAcBgorBgEEAYI3
-# AgELMQ4wDAYKKwYBBAGCNwIBFTAjBgkqhkiG9w0BCQQxFgQU9iNobPzcvy3d2oyz
-# PT5rqIn6uOIwDQYJKoZIhvcNAQEBBQAEggEAZUMahHwM46nUtaTDocy09CZtk7kd
-# tN1LpugcSYyRRiDQmjiVsCJ8NdPI6oxPr9mxW7Q1xYl/ak4l+FWcwsJ14yUs6UMn
-# V7TID92yXh6DcEv7nwVSdnideMdy2uScAaYnVCI+rVL7sqTIyyx7Ha32zCYWqqua
-# VhnxwpGFjA3XEIl4PorgKhVpVDyPeirt87dfu4OHOhOc54pCH/EunwywX1e7diZI
-# rzwR2S4Le8zMqbvw/+kn006ipiXGVZK/FGuNElvOdY7pBybONkhquZie3oAeXFPi
-# ELBorwuIm3l8kJCJuAjak0OGnMIIbYzJE5rdS6TnIrXkZI9UrlMOWMXp6Q==
+# AgELMQ4wDAYKKwYBBAGCNwIBFTAjBgkqhkiG9w0BCQQxFgQUpII1a/17e6b1trc7
+# R5A5CTGUlPMwDQYJKoZIhvcNAQEBBQAEggEAU3drJKk98LbjuPcwhuQN3o/A/KFa
+# gFQ/QzfdbKZlqxVTvE/ztGaWg0kL5/BPsoz6uGuyRUfPXCwNAzszoe+O9EsfTLop
+# DYhsUnh0ahDjO46/mobP/909Fpnlo81WLz/nysogdqWyxCJ0qDB5azlvmyRxlndN
+# u32xLqAL4lNtPsuaTEdrZlt1lTyIbU2RbvG8nA093XbSOwdBaHlC6aOa9a1qjWm0
+# Ee1zuPzvJDOgX6M9BIVsF4X/F+IgLPc+SUSmoT6L7tUv/KN9vV/fvyJTU+kyhQIY
+# 7T8roiExpZ54cssp2l50jPo1vPaAPW7Of0d3JoW9Sqp0vWboj531wRyQGA==
 # SIG # End signature block
