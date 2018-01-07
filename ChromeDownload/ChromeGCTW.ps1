@@ -253,10 +253,6 @@ function Download-GreenChrome {
 	if(-Not(Test-Path $gcinipath)){
 		Download-File 'https://static.pzhacm.org/shuax/GreenChromeTW.txt' $gcinipath
 	}
-	$updaterpath = Join-Path $installLocation 'Update.cmd'
-	if(-Not(Test-Path $updaterpath)){
-		'SET "ggbranch=beta" && SET "ggarch=D:\chrome" && @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command "iex ((New-Object System.Net.WebClient).DownloadString(''https://raw.githubusercontent.com/TkYu/PowerShellScripts/master/ChromeDownload/ChromeGCTW.ps1''))"', "@pause" -join "`r`n" | Out-File -Encoding "Default" $updaterpath
-	}
 	Write-Host 'GreenChrome(by Shuax) 下載已完成' -ForegroundColor Green
 }
 
@@ -293,12 +289,17 @@ if(Check-GCInstallLocation) {
 else{
 	Write-Host 'GreenChrome 下載已略過(本機已是最新版)' -ForegroundColor Yellow
 }
-
+$updaterpath = Join-Path $installLocation 'Update.cmd'
+if(-Not(Test-Path $updaterpath)){
+	$lower = $branch.ToString().ToLower()
+	$updateps = "@SET `"ggbranch=$lower`" && @SET `"ggarch=$arch`" && " + ('@"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy AllSigned -Command "iex ((New-Object System.Net.WebClient).DownloadString(''https://raw.githubusercontent.com/TkYu/PowerShellScripts/master/ChromeDownload/ChromeWithGreenChrome.ps1''))"')
+	'@echo Checking Chrome update. Sit back and relax.', $updateps, "@pause" -join "`r`n" | Out-File -Encoding "Default" $updaterpath
+}
 # SIG # Begin signature block
 # MIIFlwYJKoZIhvcNAQcCoIIFiDCCBYQCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUoGhb/QSfiy5r46iIQDTnV/b4
-# gTWgggMtMIIDKTCCAhWgAwIBAgIQE3U7au1O4rZEMExUKPt7LTAJBgUrDgMCHQUA
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUn4PchawpIyo3QuT/cheA01sw
+# iuigggMtMIIDKTCCAhWgAwIBAgIQE3U7au1O4rZEMExUKPt7LTAJBgUrDgMCHQUA
 # MB8xHTAbBgNVBAMTFFRLUG93ZXJTaGVsbFRlc3RDZXJ0MB4XDTE3MTEwOTA3MTg0
 # MVoXDTM5MTIzMTIzNTk1OVowHzEdMBsGA1UEAxMUVEtQb3dlclNoZWxsVGVzdENl
 # cnQwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCZwoClq3b+amIlFj53
@@ -318,11 +319,11 @@ else{
 # GhVCMYIB1DCCAdACAQEwMzAfMR0wGwYDVQQDExRUS1Bvd2VyU2hlbGxUZXN0Q2Vy
 # dAIQE3U7au1O4rZEMExUKPt7LTAJBgUrDgMCGgUAoHgwGAYKKwYBBAGCNwIBDDEK
 # MAigAoAAoQKAADAZBgkqhkiG9w0BCQMxDAYKKwYBBAGCNwIBBDAcBgorBgEEAYI3
-# AgELMQ4wDAYKKwYBBAGCNwIBFTAjBgkqhkiG9w0BCQQxFgQU4bIVS5YR9uCeUDbN
-# 0VRqIaSlOAcwDQYJKoZIhvcNAQEBBQAEggEAKPomkEQyZA1WuakzsuqRzoL5LNlP
-# c1c+So8Bw3yFJwyfs17+cFnClHXAglOWL3AuOng7an7AeXZVPMm6PC+db0HeK5dd
-# Ta/7jZsjPEarjLd7GdT5mB141g3/YuNG9SAC2pPVA9xGbSy23EHTS2Gv1gD+Qnpz
-# q/UKmT43rJEgPTKi1qYxDS4Z5lEvQx6rCIgt83JZsKw0H7l9oJFWZbqfAxjgqIU2
-# DaL7yT4EhgkmFwLBbRLePFvDW01T9kMXqIj5Lr/F8fC0JL2WLUamVSZSYiQ4ZOe9
-# zn0tRlVVCf2+ea1tHH6kY/MJ0GgY2CAvdQFJp6tN775z9Y36EiZf5ySK7w==
+# AgELMQ4wDAYKKwYBBAGCNwIBFTAjBgkqhkiG9w0BCQQxFgQU/Cmpg22ckiz1rnqY
+# l6xBXF3bHrwwDQYJKoZIhvcNAQEBBQAEggEAIvagNzorKGAmca4ySo8CD416PSb+
+# d+trI1yJkntoELN4EqJ3CaPUHjxYpxMiC/rctd4/7PnMyioe2BiNyaxdEdnALyLY
+# M1feYqNgIW8S2Bn5UnyTuefhvl6tlQcG91K4OWpyqh716Zl+oUuqLZBD3tvYtIzM
+# 4lyIr9AxxZ32MDCR8B5Sp8LeHo1oolv/iLzxrIX6ur4iN8LR6ejth69RkoniHtX3
+# L317254Cbg9hTMn421FricoUTpIU8v5+x7soy4dk7ZA2Cy0av+KagLvAhc0hx/UF
+# C+occcQBwjcwofnzPCE4no6cAV+pxAPyOeUrkUqarXkSFgTj76TLGZQ0PA==
 # SIG # End signature block
