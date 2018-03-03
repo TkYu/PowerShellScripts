@@ -1,21 +1,19 @@
-if($ENV:OS -ne 'Windows_NT'){
-	Write-Host 'Windows Plz!' -ForegroundColor Red
+﻿if($ENV:OS -ne 'Windows_NT'){
+	Write-Host '請在 Windows 作業系統上使用!' -ForegroundColor Red
 	return
 }
 if($PSVersionTable.PSVersion.Major -lt 3){
-	Write-Host "I need PowerShell major version >= 3, Current is $($PSVersionTable.PSVersion.Major)" -ForegroundColor Red
+	Write-Host "請使用 PowerShell 主要版本 >= 3, 目前版本為 $($PSVersionTable.PSVersion.Major)" -ForegroundColor Red
 	return
 }
-
 $installLocation = $env:ffdir
 $local = $env:ffloc
 $arch = $env:ffarch
 $branch = $env:ffbranch
-$url = 'https://www.mozilla.org/en-US/firefox/channel/desktop/'
 
 #$local check
 if ([string]::IsNullOrEmpty($local)){
-	$local = (Get-UICulture).Name
+	$local = 'zh-TW'
 }
 #$arch check
 if ([string]::IsNullOrEmpty($arch)){
@@ -35,84 +33,44 @@ switch ($branch)
 	'esr' {$branch = 'firefox-esr-latest'} 
 	default {$branch = 'firefox-latest'}
 }
-Write-Host "Current branch is $branch" -ForegroundColor Yellow
+Write-Host "目前設定分支為 " -NoNewline -ForegroundColor DarkYellow
+Write-Host $branch -ForegroundColor Green
 $url = "https://download.mozilla.org/?product=$branch-ssl&os=$arch&lang=$local"
 #$installLocation check
 if ([string]::IsNullOrEmpty($installLocation)){
 	$installLocation = (Resolve-Path .\).Path
 }
-
-
 if ($env:TEMP -eq $null) {
 	$env:TEMP = Join-Path $installLocation 'temp'
 }
-
 function Check-InstallLocation {
-	
-	Write-Host "Current install location is $installLocation"
 	if((Test-Path $installLocation)){
-		if(-Not ((Get-ChildItem $installLocation | Measure-Object).Count -eq 0)){
-			Write-Host 'I need an empty folder!' -ForegroundColor Red
+		if((Test-Path "$installLocation\firefox.exe")){
 			return $false
+		} else {
+			if(-Not ((Get-ChildItem $installLocation | Measure-Object).Count -eq 0)){
+				Write-Host '請在空的資料夾中執行!' -ForegroundColor Red
+				return $false
+			}
 		}
-	}
-	else{
-		Write-Host "Create directory $installLocation" -ForegroundColor Yellow
+	} else {
+		Write-Host "建立目錄 $installLocation" -ForegroundColor Yellow
 		New-Item -ItemType Directory -Force -Path $installLocation | Out-Null
 	}
 	return $true
 }
-
-function Get-Downloader {
-param (
-  [string]$url
- )
-  #WARNING: this function copy from chocolatey.org install.ps1
-  $downloader = new-object System.Net.WebClient
-  $defaultCreds = [System.Net.CredentialCache]::DefaultCredentials
-  if ($defaultCreds -ne $null) {
-	$downloader.Credentials = $defaultCreds
-  }
-
-  $withProxy = $env:ffWithProxy
-  if ($withProxy -ne $null -and $withProxy -eq 'true') {
-	# check if a proxy is required HTTP_PROXY=http://<proxy>:<port>
-	$explicitProxy = $env:HTTP_PROXY
-	if ($explicitProxy -ne $null -and $explicitProxy -ne '') {
-	  # explicit proxy
-	  $proxy = New-Object System.Net.WebProxy($explicitProxy, $true)
-	  Write-Debug "Using explicit proxy server '$explicitProxy'."
-	  $downloader.Proxy = $proxy
-
-	} elseif (!$downloader.Proxy.IsBypassed($url)) {
-	  # system proxy (pass through)
-	  $creds = $defaultCreds
-	  if ($creds -eq $null) {
-		Write-Debug "Default credentials were null. Attempting backup method"
-		$cred = get-credential
-		$creds = $cred.GetNetworkCredential();
-	  }
-	  $proxyaddress = $downloader.Proxy.GetProxy($url).Authority
-	  Write-Debug "Using system proxy server '$proxyaddress'."
-	  $proxy = New-Object System.Net.WebProxy($proxyaddress)
-	  $proxy.Credentials = $creds
-	  $downloader.Proxy = $proxy
-	}
-  } else {
-	Write-Debug "Explicitly bypassing proxy due to user environment variable"
-	$downloader.Proxy = [System.Net.GlobalProxySelection]::GetEmptyWebProxy()
-  }
-  return $downloader
-}
-
 function Download-String {
 param (
   [string]$url
  )
-	$downloader = Get-Downloader $url
+	$downloader = new-object System.Net.WebClient
+	$defaultCreds = [System.Net.CredentialCache]::DefaultCredentials
+	if ($defaultCreds -ne $null) {
+	$downloader.Credentials = $defaultCreds
+	}
+	$downloader.Proxy = [System.Net.GlobalProxySelection]::GetEmptyWebProxy()
 	return $downloader.DownloadString($url)
 }
-
 function Download-File {
 param (
   [string]$url,
@@ -135,25 +93,25 @@ param (
 	   $targetStream.Write($buffer, 0, $count)
 	   $count = $responseStream.Read($buffer,0,$buffer.length)
 	   $downloadedBytes = $downloadedBytes + $count
-	   Write-Progress -activity "Downloading file '$($url.split('/') | Select -Last 1)'" -status "Downloaded ($([System.Math]::Floor($downloadedBytes/1024))K of $($totalLength)K): " -PercentComplete ((([System.Math]::Floor($downloadedBytes/1024)) / $totalLength)  * 100)
+	   Write-Progress -activity "正在下載檔案 '$($url.split('/') | Select -Last 1)'" -status "下載進度 (已下載 $([System.Math]::Floor($downloadedBytes/1024))K , 檔案大小 $($totalLength)K): " -PercentComplete ((([System.Math]::Floor($downloadedBytes/1024)) / $totalLength)  * 100)
    }
-   Write-Progress -activity "Finished downloading file '$($url.split('/') | Select -Last 1)'" -Status "Ready" -Completed
+   Write-Progress -activity "已完成 '$($url.split('/') | Select -Last 1)'  下載" -Status "Ready" -Completed
    $targetStream.Flush()
    $targetStream.Close()
    $targetStream.Dispose()
    $responseStream.Dispose()
 }
-
 function Extract-File {
 param (
   [string]$fileName,
   [string]$dest
  )
 	#WARNING: this function copy from chocolatey.org install.ps1
-	Write-Host "Extract $fileName to $dest" -ForegroundColor Yellow
+	#Write-Host "Extract $fileName to $dest" -ForegroundColor Yellow
+	Write-Host "正在解壓縮 $($fileName.split('\') | Select -Last 1)" -ForegroundColor Yellow
 	$7zaExe = Join-Path $env:TEMP '7za.exe'
 	if (-Not (Test-Path ($7zaExe))) {
-		Write-Output "Downloading 7-Zip commandline tool prior to extraction."
+		Write-Output "為了解壓縮 Firefox 安裝包，正在下載 7-Zip 命令列工具。"
 		Download-File 'https://chocolatey.org/7za.exe' "$7zaExe"
 	}
 	$params = "x -o`"$dest`" -bd -y `"$fileName`""
@@ -168,7 +126,7 @@ param (
 	$exitCode = $process.ExitCode
 	$process.Dispose()
 
-	$errorMessage = "Unable to unzip package using 7zip. Error:"
+	$errorMessage = "無法使用 7-Zip 解壓縮 Firefox 安裝包。 錯誤:"
 	switch ($exitCode) {
 		0 { break }
 		1 { throw "$errorMessage Some files could not be extracted" }
@@ -180,7 +138,6 @@ param (
 	}
 
 }
-
 function Remove-IfExists {
 param (
   [string]$file
@@ -189,12 +146,11 @@ param (
 		Remove-Item $file
 	}
 }
-
 function Download-Firefox {
 	$downloadFileName = Join-Path $installLocation 'installer.exe'
 	Download-File $url $downloadFileName
 	if(-Not (Test-Path $downloadFileName)){
-		Write-Host 'Firefox Download Fail!' -ForegroundColor Red
+		Write-Host '下載 Firefox 失敗!' -ForegroundColor Red
 		return
 	}
 	Extract-File $downloadFileName $installLocation
@@ -202,53 +158,76 @@ function Download-Firefox {
 	Move-Item "$installLocation\core\*" -Destination $installLocation
 	Remove-IfExists "$installLocation\core"
 	Remove-IfExists $downloadFileName
-	Write-Host 'Firefox Download Finished' -ForegroundColor Green
+	Write-Host '已完成 Firefox 下載' -ForegroundColor Green
+}
+function Check-FDInstallLocation {
+	if(Test-Path $fddllpath){
+		$hash = (Get-FileHash $fddllpath -Algorithm SHA1).Hash
+	} else {
+		$hash = ''
+	}
+	if($arch -eq 'x64'){
+		if($hash -eq $FDJSON.link.x64.sha1){
+			Write-Host "$fddll 已是最新版本!" -ForegroundColor Green
+			return $false
+		}
+	} else {
+		if($hash -eq $FDJSON.link.x86.sha1){
+			Write-Host "$fddll 已是最新版本!" -ForegroundColor Green
+			return $false
+		}
+	}
+	Write-Host "$fddll 需要更新! 更新内容：" -NoNewline -ForegroundColor Yellow
+	Write-Host $FDJSON.description -ForegroundColor Gray
+	return $true
+}
+function Download-FireDoge {
+	if($arch -eq 'win64'){
+		Download-File $FDJSON.link.x64.url $fddllpath
+		$hash = (Get-FileHash $fddllpath -Algorithm SHA1).Hash
+		if($hash -ne $FDJSON.link.x64.sha1){
+			Write-Host "SHA1 不相符!" -ForegroundColor Red
+			return
+		}
+	}
+	else{
+		Download-File $FDJSON.link.x86.url $fddllpath
+		$hash = (Get-FileHash $fddllpath -Algorithm SHA1).Hash
+		if($hash -ne $FDJSON.link.x86.sha1){
+			Write-Host "SHA1 不相符!" -ForegroundColor Red
+			return
+		}
+	}
+	$fdinipath = Join-Path $installLocation 'FireDoge.ini'
+	if(-Not(Test-Path $fdinipath)){
+		Download-File 'https://static.pzhacm.org/shuax/FireDogeTW.txt' $fdinipath
+	}
+	Write-Host 'FireDoge(by Shuax) 下載已完成' -ForegroundColor Green
 }
 
 if(Check-InstallLocation) {
 	Download-Firefox
 }
 else{
-	Write-Host 'Firefox Download Skipped' -ForegroundColor Yellow
+	Write-Host 'Firefox 下載已略過(本機已存在)' -ForegroundColor Yellow
 }
 
-$JSON = Download-String 'https://api.pzhacm.org/iivb/fd.json' | ConvertFrom-Json
-if([string]::IsNullOrEmpty($JSON.description)){
-	Write-Host "Get Firedoge version fail!" -ForegroundColor Red
-	return;
-}
-Write-Host "Current Firedoge version is $($JSON.version)" -ForegroundColor Gray
-Write-Host $JSON.description -ForegroundColor Gray
-$fddll = $JSON.link.x64.url.Substring($JSON.link.x64.url.LastIndexOf("/") + 1)
-$fddllpath = Join-Path $installLocation $fddll
-if(Test-Path $fddllpath){
-	$hash = (Get-FileHash $fddllpath -Algorithm SHA1).Hash
-}else{
-	$hash = ''
-}
-if($arch -eq 'win64'){
-	if($hash -eq $JSON.link.x64.sha1){
-		Write-Host "$fddll is latest!" -ForegroundColor Green
-	}else{
-		Download-File $JSON.link.x64.url $fddllpath
-		$hash = (Get-FileHash $fddllpath -Algorithm SHA1).Hash
-		if($hash -ne $JSON.link.x64.sha1){
-			Write-Host "SHA1 not match!" -ForegroundColor Red
-			return;
-		}
+Write-Host ""
+try{
+	$FDJSON = Download-String 'https://api.pzhacm.org/iivb/fd.json' | ConvertFrom-Json
+	if([string]::IsNullOrEmpty($FDJSON.description)){
+		Write-Host '取得Firefox版本號碼失敗!' -ForegroundColor Red
+		return
 	}
+	$fddll = $FDJSON.link.x64.url.Substring($FDJSON.link.x64.url.LastIndexOf("/") + 1)
+	$fddllpath = Join-Path $installLocation $fddll
+}catch{
+	Write-Host '取得Firefox版本號碼失敗!' -ForegroundColor Red
+	return
+}
+if(Check-FDInstallLocation) {
+	Download-FireDoge
 }
 else{
-	if($hash -eq $JSON.link.x86.sha1){
-		Write-Host "$fddll is latest!" -ForegroundColor Green
-	}else{
-		Download-File $JSON.link.x86.url $fddllpath
-		$hash = (Get-FileHash $fddllpath -Algorithm SHA1).Hash
-		if($hash -ne $JSON.link.x86.sha1){
-			Write-Host "SHA1 not match!" -ForegroundColor Red
-			return;
-		}
-	}
+	Write-Host 'FireDoge 下載已略過(本機已是最新版)' -ForegroundColor Yellow
 }
-
-Write-Host 'Firedoge(by Shuax) Download Finished' -ForegroundColor Green
