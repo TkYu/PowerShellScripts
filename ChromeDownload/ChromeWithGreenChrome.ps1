@@ -1,8 +1,8 @@
-if($ENV:OS -ne 'Windows_NT'){
+if ($ENV:OS -ne 'Windows_NT') {
 	Write-Host 'Windows Plz!' -ForegroundColor Red
 	return
 }
-if($PSVersionTable.PSVersion.Major -lt 3){
+if ($PSVersionTable.PSVersion.Major -lt 3) {
 	Write-Host "I need PowerShell major version >= 3, Current is $($PSVersionTable.PSVersion.Major)" -ForegroundColor Red
 	return
 }
@@ -12,9 +12,9 @@ $arch = $env:ggarch
 $ggApi = 'https://api.pzhacm.org/iivb/cu.json'
 $gcApi = 'https://api.pzhacm.org/iivb/gc.json'
 
-if($PSVersionTable.PSVersion.Major -lt 5){
-	if (-not ([System.Management.Automation.PSTypeName]'Branch').Type){
-	Add-Type -TypeDefinition @"
+if ($PSVersionTable.PSVersion.Major -lt 5) {
+	if (-not ([System.Management.Automation.PSTypeName]'Branch').Type) {
+		Add-Type -TypeDefinition @"
 	   public enum Branch
 	   {
 		  Stable,
@@ -25,7 +25,7 @@ if($PSVersionTable.PSVersion.Major -lt 5){
 "@
 	}
 }
-else{
+else {
 	Enum Branch{
 		Stable
 		Beta
@@ -35,27 +35,33 @@ else{
 }
 
 #$arch check
-if ([string]::IsNullOrEmpty($arch)){
-	if($ENV:PROCESSOR_ARCHITECTURE -eq 'AMD64'){
+if ([string]::IsNullOrEmpty($arch)) {
+	if ($ENV:PROCESSOR_ARCHITECTURE -eq 'AMD64') {
 		$arch = 'x64'
 	}
-	else{
+	else {
 		$arch = 'x86'
 	}
 }
 
+$setDllExe = Join-Path $env:TEMP 'shuaxCAOdll32.exe'
+$setDllUrl = 'https://cdn.jsdelivr.net/gh/TkYu/PowerShellScripts/tools/setdll32.bin'
+if ($arch -eq 'x64') {
+	$setDllExe = Join-Path $env:TEMP 'shuaxCAOdll64.exe'
+	$setDllUrl = 'https://cdn.jsdelivr.net/gh/TkYu/PowerShellScripts/tools/setdll64.bin'
+}
+
 #$installLocation check
-if ([string]::IsNullOrEmpty($installLocation)){
+if ([string]::IsNullOrEmpty($installLocation)) {
 	$installLocation = (Resolve-Path .\).Path
 }
 
 #$branch check
-switch ($env:ggbranch) 
-{ 
-	'canary' {$branch = [Branch]::Canary} 
-	'dev' {$branch = [Branch]::Dev} 
-	'beta' {$branch = [Branch]::Beta} 
-	default {$branch = [Branch]::Stable}
+switch ($env:ggbranch) { 
+	'canary' { $branch = [Branch]::Canary } 
+	'dev' { $branch = [Branch]::Dev } 
+	'beta' { $branch = [Branch]::Beta } 
+	default { $branch = [Branch]::Stable }
 }
 #if([Enum]::Getvalues([Branch]) -contains $branch) {
 #	$Branch = [Enum]::Parse([Type]"Branch",$branch)
@@ -66,28 +72,30 @@ if ($env:TEMP -eq $null) {
 	$env:TEMP = Join-Path $installLocation 'temp'
 }
 function Check-InstallLocation {
-	if((Test-Path $installLocation)){
-		if((Test-Path "$installLocation\chrome.exe")){
+	if ((Test-Path $installLocation)) {
+		if ((Test-Path "$installLocation\chrome.exe")) {
 			$onlineVersion = [System.Version]($JSON.$branch.$arch.version)
 			$localVersion = (Get-Item "$installLocation\chrome.exe").VersionInfo.FileVersion
-			if($onlineVersion -gt $localVersion){
+			if ($onlineVersion -gt $localVersion) {
 				Write-Host "Online version is " -NoNewline
 				Write-Host $onlineVersion -NoNewline -ForegroundColor Green
 				Write-Host ", Local version is " -NoNewline
 				Write-Host $localVersion -NoNewline -ForegroundColor Yellow
 				Write-Host ', let`s update!'
 			}
-			else{
+			else {
 				Write-Host "You have the latest version($localVersion)/$branch/$arch" -ForegroundColor Green
 				return $false
 			}
-		} else {
-			if(-Not ((Get-ChildItem $installLocation | Measure-Object).Count -eq 0)){
+		}
+		else {
+			if (-Not ((Get-ChildItem $installLocation | Measure-Object).Count -eq 0)) {
 				Write-Host 'I need an empty folder!' -ForegroundColor Red
 				return $false
 			}
 		}
-	} else {
+	}
+ else {
 		Write-Host "Create directory $installLocation" -ForegroundColor Yellow
 		New-Item -ItemType Directory -Force -Path $installLocation | Out-Null
 	}
@@ -95,51 +103,50 @@ function Check-InstallLocation {
 }
 
 function Download-String {
-param (
+	param (
   [string]$url
  )
 	$downloader = new-object System.Net.WebClient
 	$defaultCreds = [System.Net.CredentialCache]::DefaultCredentials
 	if ($defaultCreds -ne $null) {
-	$downloader.Credentials = $defaultCreds
+		$downloader.Credentials = $defaultCreds
 	}
 	$downloader.Proxy = [System.Net.GlobalProxySelection]::GetEmptyWebProxy()
 	return $downloader.DownloadString($url)
 }
 
 function Download-File {
-param (
+	param (
   [string]$url,
   [string]$targetFile
  )
-   #https://blogs.msdn.microsoft.com/jasonn/2008/06/13/downloading-files-from-the-internet-in-powershell-with-progress/
-   $uri = New-Object "System.Uri" "$url"
-   $request = [System.Net.HttpWebRequest]::Create($uri)
-   $request.Proxy = [System.Net.GlobalProxySelection]::GetEmptyWebProxy()
-   $request.Timeout = 200000 #200 second timeout 
-   $response = $request.GetResponse()
-   $totalLength = [System.Math]::Floor($response.get_ContentLength()/1024)
-   $responseStream = $response.GetResponseStream()
-   $targetStream = New-Object -TypeName System.IO.FileStream -ArgumentList $targetFile, Create
-   $buffer = new-object byte[] 256KB
-   $count = $responseStream.Read($buffer,0,$buffer.length)
-   $downloadedBytes = $count
-   while ($count -gt 0)
-   {
-	   $targetStream.Write($buffer, 0, $count)
-	   $count = $responseStream.Read($buffer,0,$buffer.length)
-	   $downloadedBytes = $downloadedBytes + $count
-	   Write-Progress -activity "Downloading file '$($url.split('/') | Select -Last 1)'" -status "Downloaded ($([System.Math]::Floor($downloadedBytes/1024))K of $($totalLength)K): " -PercentComplete ((([System.Math]::Floor($downloadedBytes/1024)) / $totalLength)  * 100)
-   }
-   Write-Progress -activity "Finished downloading file '$($url.split('/') | Select -Last 1)'" -Status "Ready" -Completed
-   $targetStream.Flush()
-   $targetStream.Close()
-   $targetStream.Dispose()
-   $responseStream.Dispose()
+	#https://blogs.msdn.microsoft.com/jasonn/2008/06/13/downloading-files-from-the-internet-in-powershell-with-progress/
+	$uri = New-Object "System.Uri" "$url"
+	$request = [System.Net.HttpWebRequest]::Create($uri)
+	$request.Proxy = [System.Net.GlobalProxySelection]::GetEmptyWebProxy()
+	$request.Timeout = 200000 #200 second timeout 
+	$response = $request.GetResponse()
+	$totalLength = [System.Math]::Floor($response.get_ContentLength()/1024)
+	$responseStream = $response.GetResponseStream()
+	$targetStream = New-Object -TypeName System.IO.FileStream -ArgumentList $targetFile, Create
+	$buffer = new-object byte[] 256KB
+	$count = $responseStream.Read($buffer, 0, $buffer.length)
+	$downloadedBytes = $count
+	while ($count -gt 0) {
+		$targetStream.Write($buffer, 0, $count)
+		$count = $responseStream.Read($buffer, 0, $buffer.length)
+		$downloadedBytes = $downloadedBytes + $count
+		Write-Progress -activity "Downloading file '$($url.split('/') | Select -Last 1)'" -status "Downloaded ($([System.Math]::Floor($downloadedBytes/1024))K of $($totalLength)K): " -PercentComplete ((([System.Math]::Floor($downloadedBytes/1024)) / $totalLength)  * 100)
+	}
+	Write-Progress -activity "Finished downloading file '$($url.split('/') | Select -Last 1)'" -Status "Ready" -Completed
+	$targetStream.Flush()
+	$targetStream.Close()
+	$targetStream.Dispose()
+	$responseStream.Dispose()
 }
 
 function Extract-File {
-param (
+	param (
   [string]$fileName,
   [string]$dest
  )
@@ -149,7 +156,7 @@ param (
 	$7zaExe = Join-Path $env:TEMP '7za.exe'
 	if (-Not (Test-Path ($7zaExe))) {
 		Write-Output "Downloading 7-Zip commandline tool prior to extraction."
-		Download-File 'https://chocolatey.org/7za.exe' "$7zaExe"
+		Download-File 'https://cdn.jsdelivr.net/gh/TkYu/PowerShellScripts/tools/7za.bin' "$7zaExe"
 	}
 	$params = "x -o`"$dest`" -bd -y `"$fileName`""
 	$process = New-Object System.Diagnostics.Process
@@ -176,11 +183,38 @@ param (
 
 }
 
+function Set-Dll {
+	param (
+		[string]$fileName
+	)
+	if (-Not (Test-Path ($setDllExe))) {
+		Write-Output "Downloading SetDll commandline tool prior to extraction."
+		Download-File $setDllUrl "$setDllExe"
+	}
+	$bakfile = Join-Path $installLocation 'chrome.exe~'
+	Remove-IfExists $bakfile
+	$params = "/d:$fileName chrome.exe"
+	$process = New-Object System.Diagnostics.Process
+	$process.StartInfo = New-Object System.Diagnostics.ProcessStartInfo($setDllExe, $params)
+	$process.StartInfo.WorkingDirectory = $installLocation
+	$process.StartInfo.RedirectStandardOutput = $true
+	$process.StartInfo.UseShellExecute = $false
+	$process.StartInfo.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+	$process.Start() | Out-Null
+	$process.BeginOutputReadLine()
+	$process.WaitForExit()
+	$exitCode = $process.ExitCode
+	$process.Dispose()
+	if ($exitCode -eq 0) {
+		Remove-IfExists $bakfile
+	}
+}
+
 function Remove-IfExists {
-param (
+	param (
   [string]$file
  )
-	if(Test-Path $file){
+	if (Test-Path $file) {
 		Remove-Item $file
 	}
 }
@@ -190,12 +224,12 @@ function Download-Chrome {
 	$url = $JSON.$branch.$arch.cdn
 	$downloadFileName = Join-Path $installLocation $($url.split('/') | Select -Last 1)
 	Download-File $url $downloadFileName
-	if(-Not (Test-Path $downloadFileName)){
+	if (-Not (Test-Path $downloadFileName)) {
 		Write-Host 'Chrome Download Fail!' -ForegroundColor Red
 		return
 	}
 	$hash = (Get-FileHash $downloadFileName -Algorithm SHA256).Hash
-	if($hash -ne $JSON.$branch.$arch.sha256){
+	if ($hash -ne $JSON.$branch.$arch.sha256) {
 		Write-Host "SHA256 not match!" -ForegroundColor Red
 		Remove-IfExists $downloadFileName
 		return
@@ -210,18 +244,20 @@ function Download-Chrome {
 }
 
 function Check-GCInstallLocation {
-	if(Test-Path $gcdllpath){
+	if (Test-Path $gcdllpath) {
 		$hash = (Get-FileHash $gcdllpath -Algorithm SHA1).Hash
-	} else {
+	}
+ else {
 		$hash = ''
 	}
-	if($arch -eq 'x64'){
-		if($hash -eq $GCJSON.link.x64.sha1){
+	if ($arch -eq 'x64') {
+		if ($hash -eq $GCJSON.link.x64.sha1) {
 			Write-Host "$gcdll is latest!" -ForegroundColor Green
 			return $false
 		}
-	} else {
-		if($hash -eq $GCJSON.link.x86.sha1){
+	}
+ else {
+		if ($hash -eq $GCJSON.link.x86.sha1) {
 			Write-Host "$gcdll is latest!" -ForegroundColor Green
 			return $false
 		}
@@ -232,69 +268,75 @@ function Check-GCInstallLocation {
 }
 
 function Download-GreenChrome {
-	if($arch -eq 'x64'){
+	if ($arch -eq 'x64') {
 		Download-File $GCJSON.link.x64.url $gcdllpath
 		$hash = (Get-FileHash $gcdllpath -Algorithm SHA1).Hash
-		if($hash -ne $GCJSON.link.x64.sha1){
+		if ($hash -ne $GCJSON.link.x64.sha1) {
 			Write-Host "SHA1 not match!" -ForegroundColor Red
 			return
 		}
 	}
-	else{
+	else {
 		Download-File $GCJSON.link.x86.url $gcdllpath
 		$hash = (Get-FileHash $gcdllpath -Algorithm SHA1).Hash
-		if($hash -ne $GCJSON.link.x86.sha1){
+		if ($hash -ne $GCJSON.link.x86.sha1) {
 			Write-Host "SHA1 not match!" -ForegroundColor Red
 			return
 		}
 	}
+    if (Test-Path $gcdll) {
+        Set-Dll $gcdll
+    }
 	Write-Host 'GreenChrome(by Shuax) download finished' -ForegroundColor Green
 }
 
 Write-Host ""
-try{
+try {
 	$JSON = Download-String $ggApi | ConvertFrom-Json
-}catch{
+}
+catch {
 	Write-Host 'Get Chrome versions failed!' -ForegroundColor Red
 	return
 }
-if(Check-InstallLocation) {
+if (Check-InstallLocation) {
 	Download-Chrome
 }
-else{
+else {
 	Write-Host 'Chrome download skipped' -ForegroundColor Yellow
 }
 
 Write-Host ""
-try{
+try {
 	$GCJSON = Download-String $gcApi | ConvertFrom-Json
-	if([string]::IsNullOrEmpty($GCJSON.description)){
+	if ([string]::IsNullOrEmpty($GCJSON.description)) {
 		Write-Host 'Get GreenChrome versions failed!' -ForegroundColor Red
 		return
 	}
 	$gcdll = $GCJSON.link.x64.url.Substring($GCJSON.link.x64.url.LastIndexOf("/") + 1)
 	$gcdllpath = Join-Path $installLocation $gcdll
-}catch{
+}
+catch {
 	Write-Host 'Get GreenChrome versions failed!' -ForegroundColor Red
 	return
 }
-if(Check-GCInstallLocation) {
+if (Check-GCInstallLocation) {
 	Download-GreenChrome
 }
-else{
+else {
 	Write-Host 'GreenChrome download skipped' -ForegroundColor Yellow
 }
-$updaterpath = Join-Path $installLocation 'Update.cmd'
-if(-Not(Test-Path $updaterpath)){
-	$lower = $branch.ToString().ToLower()
-	$updateps = "@SET `"ggbranch=$lower`" && @SET `"ggarch=$arch`" && " + ('@"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy AllSigned -Command "iex ((New-Object System.Net.WebClient).DownloadString(''https://raw.githubusercontent.com/TkYu/PowerShellScripts/master/ChromeDownload/ChromeWithGreenChrome.ps1''))"')
-	'@echo Checking Chrome update. Sit back and relax.', $updateps, "@pause" -join "`r`n" | Out-File -Encoding "Default" $updaterpath
-}
+# $updaterpath = Join-Path $installLocation 'Update.cmd'
+# if (-Not(Test-Path $updaterpath)) {
+# 	$lower = $branch.ToString().ToLower()
+# 	$updateps = "@SET `"ggbranch=$lower`" && @SET `"ggarch=$arch`" && " + ('@"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy AllSigned -Command "iex ((New-Object System.Net.WebClient).DownloadString(''https://raw.githubusercontent.com/TkYu/PowerShellScripts/master/ChromeDownload/ChromeWithGreenChrome.ps1''))"')
+# 	'@echo Checking Chrome update. Sit back and relax.', $updateps, "@pause" -join "`r`n" | Out-File -Encoding "Default" $updaterpath
+# }
+
 # SIG # Begin signature block
 # MIIFlwYJKoZIhvcNAQcCoIIFiDCCBYQCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUNtUgf3lCtrFWM9aQBTWfztA3
-# ItygggMtMIIDKTCCAhWgAwIBAgIQE3U7au1O4rZEMExUKPt7LTAJBgUrDgMCHQUA
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUnwzy+05XoS99wRGF8FeKBKUg
+# 7W6gggMtMIIDKTCCAhWgAwIBAgIQE3U7au1O4rZEMExUKPt7LTAJBgUrDgMCHQUA
 # MB8xHTAbBgNVBAMTFFRLUG93ZXJTaGVsbFRlc3RDZXJ0MB4XDTE3MTEwOTA3MTg0
 # MVoXDTM5MTIzMTIzNTk1OVowHzEdMBsGA1UEAxMUVEtQb3dlclNoZWxsVGVzdENl
 # cnQwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCZwoClq3b+amIlFj53
@@ -314,11 +356,11 @@ if(-Not(Test-Path $updaterpath)){
 # GhVCMYIB1DCCAdACAQEwMzAfMR0wGwYDVQQDExRUS1Bvd2VyU2hlbGxUZXN0Q2Vy
 # dAIQE3U7au1O4rZEMExUKPt7LTAJBgUrDgMCGgUAoHgwGAYKKwYBBAGCNwIBDDEK
 # MAigAoAAoQKAADAZBgkqhkiG9w0BCQMxDAYKKwYBBAGCNwIBBDAcBgorBgEEAYI3
-# AgELMQ4wDAYKKwYBBAGCNwIBFTAjBgkqhkiG9w0BCQQxFgQUGer8gFeE6QiQCz7v
-# DO6U9seml3QwDQYJKoZIhvcNAQEBBQAEggEAUL5oEhfJLBRIxH4n5+nDVPCcj3r7
-# B+OgTBnP0MOiJvgPPQHzQi4MvpleHkmAh0TFWSlGelb61WUdrzYC4aJVc+EPlLjD
-# kqZ/d8bw4TMIaI+uzTjUWtaIxZjUe2V+rXR+SDRoJUMWwLJtksSQQZaz538KLTmu
-# dvKftjCPoTZcoGEOGj63P9hQ06EnOfCNfg2Wg8nPVUpd7TwBB52KILGnEur0PIZY
-# fWgwefGpISzV6zqmDhWYz+EKgx9kNhEYfCeLR8X3NO0CaGvBL61dxRW80pVhMtZT
-# Zh93/SxkkLnGybUA+hEINhWA74cePj+Gb5er6yZuuAj1I+9cylSOdg3rtQ==
+# AgELMQ4wDAYKKwYBBAGCNwIBFTAjBgkqhkiG9w0BCQQxFgQU945GWmkXCviqHamE
+# wBFRG9AjGy0wDQYJKoZIhvcNAQEBBQAEggEALC18UZSEoFRSqQt/JIfvb3ADkJn3
+# ce0Ehegw6o0SQI+x7/L2Ddhh69nklPkwb7d5WMQatrk5tgz+X6aGfcPEqKroKnMQ
+# HBYAO8F48RcgAwVxSvzcgmGQPPPma8XPO+edekYirYQAj/2UaGElMH9/qJ3ImLR5
+# tLwRL9dr+eD6vA5JHvf9ggbO6xpJTHOVGxtWUK1wczhNj54Kfewgj5ZbpJ8d2BVj
+# vwTM9MdTCxHf2ApH0YpWVD/kTHQTMb2jfA+/ZDxBt38KDONP37tzfZf3g6Z8CniA
+# mlRO9YyxL/xQtwDR5A57omiD6m/FgVcrPcSp/jR8XIaGLaOZSwPmmIqr/Q==
 # SIG # End signature block
